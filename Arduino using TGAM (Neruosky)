@@ -1,0 +1,112 @@
+int BUZZER_PIN=13;
+#define BAUDRATE 57600
+#define DEBUGOUTPUT 0
+
+//check related variables
+int generatedChecksum = 0;
+byte checksum = 0; 
+
+
+// receiving data length & data group
+byte payloadLength = 0; // data length
+byte payloadData[32] = {0}; //All 32 groups of data collected (initial?)
+//The related data collected
+byte signalquality = 0;//signal quality
+byte attention = 0; //Attention
+byte meditation = 0; //Meditation (relax)
+
+
+//Initialising
+void setup() 
+{
+ Serial.begin(BAUDRATE);
+ pinMode(BUZZER_PIN, OUTPUT); }
+bool changed_significantly(int value) {
+ const int change_threshold = 20; // tune to taste
+ static int old_value;
+ bool changed = abs(value - old_value) >= change_threshold;
+ if (changed){
+ old_value = value;
+ }
+ return changed;
+}
+
+
+//Reading one byte's data from port
+byte ReadOneByte() 
+{
+ int ByteRead;
+ while(!Serial.available());
+ ByteRead = Serial.read();
+ return ByteRead;//back to the already-read byte
+}
+
+
+//Reading data from port
+void read_serial_data()
+{
+ //Looking for 2 initial synchronization byte from data packets
+ if(ReadOneByte() == 0xAA)//first byte
+ {
+ if(ReadOneByte() == 0xAA)//second byte
+ {
+ payloadLength = ReadOneByte();// Reading the third one - the length of the data packets
+ if(payloadLength == 0x20)//Keep reading if its readinng big pack of data, abandon if small package 
+ {
+ generatedChecksum = 0; //Check and reset variable to 0 
+ for(int i = 0; i < payloadLength; i++)// Contantly reading 32 bytes
+ { 
+ payloadData[i] = ReadOneByte();//Reading data from data pack with specified length
+ generatedChecksum += payloadData[i];//Calculating the data sumed up
+ } 
+ checksum = ReadOneByte();//Reading checked byte 
+ 
+ //check
+ generatedChecksum = (~generatedChecksum)&0xff; 
+ 
+ 
+ //Comparing checked byte
+ if(checksum == generatedChecksum)// if data received is correct after checking, keep going 
+ { 
+ signalquality = 0;//initial variable of signalquality 
+ attention = 0; //initial variable of attention
+ //assign to data collected
+ signalquality = payloadData[1];//signalquality 
+ attention = payloadData[29];//attention
+ meditation = payloadData[31];//relaxation
+ #if !DEBUGOUTPUT 
+ 
+ //print SignalQuality
+ /*Serial.print("SignalQuality: ");
+ Serial.print(signalquality, DEC);
+ //print Attention
+ Serial.print("Attention: ");
+ Serial.print(attention, DEC);
+ //print relaxation
+ Serial.print("Meditation: ");
+ Serial.print(meditation, DEC);
+ //next line
+ Serial.print("\n"); 
+ */ 
+ 
+ String valuesOne = String(attention) + ";" + String(meditation);
+ Serial.print(valuesOne);
+ Serial.print("\n");
+ 
+ #endif 
+ } 
+ } 
+ }
+ } }
+ 
+ 
+//to circulate the data collection
+void loop() 
+{
+read_serial_data();//reading from serial port
+ if (changed_significantly(attention)){
+ Serial.println("attention changed.");
+ digitalWrite(BUZZER_PIN, HIGH) ;
+ delay(100);
+ digitalWrite(BUZZER_PIN, LOW) ;
+ } }
