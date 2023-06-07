@@ -1,0 +1,138 @@
+import processing.serial.*;
+Serial playerOne;  // Create object from Serial class
+
+int past=0; //time value of default player
+int pastSer=0; //time value of the active player
+int d = 0;
+float velSer = 0, velDefault = 0;
+float calcVelValDefault = 0;
+float calcVelValSer = 0;
+int defaultAttention[] = {37, 34, 51, 63, 54, 64, 41, 26, 37, 34, 54, 61, 66, 80, 83, 81, 63, 51, 37, 26, 30, 37, 35, 34, 44, 47, 53, 51, 40, 44, 51, 66, 60, 57, 57, 70, 77, 75, 66};
+int defaultMeditation[] ={27, 23, 30, 34, 37, 75, 66, 78, 80, 38, 51, 37, 43, 64, 51, 47, 40, 34, 30, 24, 35, 48, 66, 80, 74, 80, 83, 84, 83, 61, 48, 43, 43, 61, 60, 57, 66, 80, 70};
+
+String mindValOne = "";    
+int attentionOne ;
+int meditationOne ;
+
+PImage imgBG;
+PImage imgR2L;
+PImage imgR2R;
+Player p1, p2;
+
+Excel excel;
+
+float calcVel(int att, int med) {
+  float v = 0;
+  v = sqrt((att-med)*(att-med));
+  v = map(v, 0, 100, 0, TWO_PI/180);
+  return v;
+}
+
+void showPlayerDefault() { // default player 
+  int now = millis();
+  if (now - past >500) {
+    past = now;
+    if (d>=defaultAttention.length) {
+      d=0;
+    }
+    calcVelValDefault = calcVel(defaultAttention[d], defaultMeditation[d]);
+    excel.add2(defaultAttention[d],defaultMeditation[d]);
+    d++;
+  }
+  velDefault+=calcVelValDefault;
+  int r = floor(velDefault/TWO_PI);
+  p2.round = r;
+  drawPlayer(p2, velDefault);
+}
+
+void showPlayerSer() { // activated player
+  int now = millis();
+  if (now - pastSer >500) {
+    pastSer = now;
+    println(attentionOne, meditationOne);
+    calcVelValSer = calcVel(attentionOne, meditationOne);
+  }
+  velSer+=calcVelValSer;
+  //println("velSer:"+velSer);
+  int r = floor(velSer/TWO_PI);
+  p1.round = r;
+  drawPlayer(p1, velSer);
+}
+
+void drawPlayer(Player p, float vel) {
+  float x = (4 * sin(1 * vel))*32+233;
+  float y = (1 * sin(2 * vel))*35+763;
+  p.setPos(x, y);
+  p.display();
+}
+
+void initSerial() {
+  printArray(Serial.list());
+  String portNameOne = Serial.list()[0]; 
+  playerOne = new Serial(this, portNameOne, 57600);
+}
+
+void serialEvent(Serial playerOne) {
+  //put the incoming data into a String -
+  //the '\n' is our end delimiter indicating the end of a complete packet
+  mindValOne = playerOne.readStringUntil('\n');
+  if (mindValOne != null) {
+    //if there is an incoming message,n we first clean it up
+    mindValOne = trim(mindValOne);
+    //we split the message based on the comma as delimiter into an array
+    int attMedValuesOne[] = int(split(mindValOne, ";"));
+    //if we have received two values (we are expecting two values), proceed
+    if (attMedValuesOne.length == 2) {
+      //save the integer values into our variables
+      attentionOne = attMedValuesOne[0];
+      meditationOne = attMedValuesOne[1];
+      println(attentionOne);
+      println(meditationOne);
+      excel.add1(attentionOne,meditationOne);
+    }
+  }
+}
+void setup() {
+  size(450, 974);
+  imgBG = loadImage("bg.png");
+  imgR2L = loadImage("r2l.png");
+  imgR2R = loadImage("r2r.png");
+  p1 = new Player(true);
+  p2 = new Player(false);
+  initSerial();
+  excel = new Excel();
+  excel.add1(10,10);
+  excel.add2(10,10);
+}
+
+void draw() {
+  background(255);
+  image(imgBG, 0, 0);
+  showPlayerDefault();
+  showPlayerSer();
+  excel.display();
+}
+void mousePressed() {
+  println(mouseX, mouseY);
+}
+
+void drawL() {
+  float last_x = -1;
+  float last_y = -1;
+
+  for (float theta=0; theta<TWO_PI; theta+=TWO_PI/360)
+  {
+    float x = (4 * sin(1 * theta))*32+233;
+    float y = (1 * sin(2 * theta))*35+763;
+
+    stroke(0);
+    if (last_x != -1 && last_y != -1)
+    {
+      line(last_x, last_y, x, y);
+      line(last_x-1, last_y, x-1, y);
+    }
+    last_x = x;
+    last_y = y;
+    //p1.setPos(x,y);
+  }
+}
